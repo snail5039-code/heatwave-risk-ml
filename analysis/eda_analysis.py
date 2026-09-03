@@ -165,27 +165,34 @@ importance_df = importance_df.sort_values(
     ascending=False  
 )
 
-print("\n랜덤포레스트 기상 변수 중요도:")
-print(importance_df)
+# print("\n랜덤포레스트 기상 변수 중요도:")
+# print(importance_df)
 
 # 중요도 막대 그래프
-chart_importance = importance_df.sort_values(
-    by="중요도",
-    ascending=True
+# chart_importance = importance_df.sort_values(
+#     by="중요도",
+#     ascending=True
+# )
+
+# plt.figure(figsize=(9, 5))
+# plt.barh(
+#     chart_importance["기상 변수"],  # y축: 기상 변수 이름
+#     chart_importance["중요도"],     # x축: 변수 중요도
+#     color="orange"                  # 막대 색상
+# )
+
+# plt.title("랜덤포레스트 기상 변수 중요도")
+# plt.xlabel("중요도")
+# plt.ylabel("기상 변수")
+# plt.grid(
+#     axis="x",
+#     alpha=0.3
+# )
+# plt.show()
+
+patient_quantiles = df["total_patients"].quantile(
+    [0.25, 0.50, 0.75] 
 )
 
-plt.figure(figsize=(9, 5))
-plt.barh(
-    chart_importance["기상 변수"],  # y축: 기상 변수 이름
-    chart_importance["중요도"],     # x축: 변수 중요도
-    color="orange"                  # 막대 색상
-)
-
-plt.title("랜덤포레스트 기상 변수 중요도")
-plt.xlabel("중요도")
-plt.ylabel("기상 변수")
-plt.grid(
-    axis="x",
-    alpha=0.3
-)
-plt.show()
+# print("\n일일 온열질환자 수 분위수")
+# print(patient_quantiles) 

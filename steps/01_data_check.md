@@ -6,8 +6,8 @@
 
 ## 할 일
 
-- `heat_illness_2025_unified.csv` 불러오기
-- `OBS_ASOS_DD_20260830192528.csv` 불러오기
+- `data/raw/2025/heat_illness_2025_unified.csv` 불러오기
+- `data/raw/2025/OBS_ASOS_DD_20260830192528.csv` 불러오기
 - 컬럼명, 행 수, 날짜 범위 확인
 - 결측치 개수 확인
 - 온열질환 데이터에서 `daily_national` 행만 우선 사용

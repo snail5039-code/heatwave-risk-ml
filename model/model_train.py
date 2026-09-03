@@ -64,7 +64,7 @@ weather_files = [
     BASE_DIR / "data" / "raw" / "2022" / "OBS_ASOS_DD_20260831142714.csv",
     BASE_DIR / "data" / "raw" / "2023" / "OBS_ASOS_DD_20260831142744.csv",
     BASE_DIR / "data" / "raw" / "2024" / "OBS_ASOS_DD_20260831142808.csv",
-    BASE_DIR / "data" / "raw" / "OBS_ASOS_DD_20260830192528.csv"
+    BASE_DIR / "data" / "raw" / "2025" / "OBS_ASOS_DD_20260830192528.csv"
 ]
 
 
