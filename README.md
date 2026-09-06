@@ -5,6 +5,11 @@
 
 > 예측값은 전국 단위의 하루 예상 신고 환자 수입니다. 특정 지역의 실제 환자 수, 개인의 발병 확률 또는 외출 안전 판정을 의미하지 않습니다.
 
+## 배포 주소
+
+- Streamlit 앱: https://heatwave-risk-ml-twwshgp6evhagezahawdeq.streamlit.app/
+- Next.js 웹사이트: https://web-wine-one-11.vercel.app/
+
 ## 주요 기능
 
 - 전체 연령 / 65세 이상 예측 모델 선택
@@ -19,6 +24,8 @@
 ### 1. Streamlit 앱
 
 Python만으로 실행하는 분석형 대시보드입니다. 사이드바에서 예측 조건을 입력하고 `예측 결과`, `모델 정보`, `데이터 분석` 탭을 확인할 수 있습니다.
+
+배포 주소: https://heatwave-risk-ml-twwshgp6evhagezahawdeq.streamlit.app/
 
 #### 예측 결과
 
@@ -35,6 +42,8 @@ Python만으로 실행하는 분석형 대시보드입니다. 사이드바에서
 ### 2. Next.js 웹사이트
 
 기존 Python 모델과 데이터, 기상 API 로직을 TypeScript로 이식한 별도 웹 대시보드입니다. 요청마다 Python을 실행하지 않아 Vercel 같은 서버리스 환경에도 배포할 수 있습니다. 데스크톱과 모바일 화면에 대응하는 반응형 UI를 제공합니다.
+
+배포 주소: https://web-wine-one-11.vercel.app/
 
 #### 예측 결과
 
