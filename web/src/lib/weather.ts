@@ -4,6 +4,13 @@
 import iconv from "iconv-lite";
 import { LOCATIONS, findLocation, type Location } from "./locations";
 
+// AbortSignal.timeout()은 Node 17.3+에서만 지원돼 배포 환경에 따라 없을 수 있어 직접 구현한다.
+function timeoutSignal(ms: number): AbortSignal {
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(new Error(`요청이 ${ms}ms 안에 끝나지 않았습니다.`)), ms);
+  return controller.signal;
+}
+
 type OpenMeteoDaily = {
   temperature_2m_mean: number[];
   temperature_2m_min: number[];
@@ -24,8 +31,18 @@ type OpenMeteoHourly = {
 
 type OpenMeteoResponse = { daily: OpenMeteoDaily; hourly: OpenMeteoHourly };
 
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
+// 서버 실행 위치(UTC 등)와 무관하게 항상 한국 시간 기준 날짜(YYYY-MM-DD)를 돌려준다.
+// Date.toISOString()이나 setHours()는 로컬/UTC 기준이라 Vercel(UTC 서버)에서는
+// 다른 날짜가 나올 수 있어 쓰지 않는다.
+const KST_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function koreaDateString(date: Date): string {
+  return KST_DATE_FORMATTER.format(date);
 }
 
 async function getLocationWeather(location: Location, date: string, endDate: string = date): Promise<OpenMeteoResponse> {
@@ -51,7 +68,7 @@ async function getLocationWeather(location: Location, date: string, endDate: str
   url.searchParams.set("start_date", date);
   url.searchParams.set("end_date", endDate);
 
-  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  const response = await fetch(url, { signal: timeoutSignal(10_000) });
   if (!response.ok) throw new Error(`Open-Meteo 요청 실패 (${response.status})`);
   return response.json();
 }
@@ -85,11 +102,12 @@ export async function getCityOutingWeather(
 ): Promise<NationalWeather> {
   const location = findLocation(selectedCity);
 
-  const startTime = new Date(`${date}T00:00:00+09:00`);
-  startTime.setHours(startHour, 0, 0, 0);
+  // setHours()는 서버의 로컬 타임존을 기준으로 시각을 바꾸기 때문에(UTC 서버에서는 KST와 어긋남)
+  // 문자열에 +09:00을 직접 명시해 항상 한국 시간 기준 시작 시각을 만든다.
+  const startTime = new Date(`${date}T${String(startHour).padStart(2, "0")}:00:00+09:00`);
   const endTime = new Date(startTime.getTime() + (durationMinutes === 0 ? 60 : durationMinutes) * 60_000);
 
-  const weather = await getLocationWeather(location, date, isoDate(endTime));
+  const weather = await getLocationWeather(location, date, koreaDateString(endTime));
   const { hourly, daily } = weather;
 
   let totalMinutes = 0;
@@ -158,7 +176,7 @@ export async function getHeatwaveWarning(authKey: string, selectedCity: string, 
     return { status: "no_key", message: "기상청 API 인증키를 입력하면 공식 폭염특보가 표시됩니다." };
   }
 
-  const today = isoDate(new Date());
+  const today = koreaDateString(new Date());
   if (date > today) {
     return { status: "not_announced", message: "선택한 미래 날짜의 공식 폭염특보는 아직 발표되지 않았습니다." };
   }
@@ -172,7 +190,7 @@ export async function getHeatwaveWarning(authKey: string, selectedCity: string, 
 
   let responseText: string;
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    const response = await fetch(url, { signal: timeoutSignal(10_000) });
     if (!response.ok) throw new Error(`기상청 응답 오류 (${response.status})`);
     responseText = decodeKmaResponse(await response.arrayBuffer());
   } catch {

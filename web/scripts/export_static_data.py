@@ -37,6 +37,19 @@ TARGETS = [
 ]
 
 
+def export_preview(data, rows=5):
+    preview_rows = []
+    for _, row in data.head(rows).iterrows():
+        formatted = {}
+        for column, value in row.items():
+            if isinstance(value, float):
+                formatted[column] = round(value, 4)
+            else:
+                formatted[column] = value.item() if hasattr(value, "item") else value
+        preview_rows.append(formatted)
+    return {"columns": list(data.columns), "rows": preview_rows}
+
+
 def export_tree(tree):
     return [
         {
@@ -77,6 +90,8 @@ def main():
             json.dumps({
                 "target": entry["target"],
                 "rowCount": int(len(data)),
+                "weatherColumns": columns,
+                "preview": export_preview(data),
                 "timeSeries": time_series,
                 "scatter": scatter,
                 "importance": importance,

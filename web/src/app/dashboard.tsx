@@ -30,6 +30,8 @@ type PredictionResponse = {
 type AnalysisResponse = {
   target: string;
   rowCount: number;
+  weatherColumns: string[];
+  preview: { columns: string[]; rows: Record<string, string | number>[] };
   timeSeries: { date: string; patients: number }[];
   scatter: { temperature: number; patients: number }[];
   importance: { feature: string; value: number }[];
@@ -172,25 +174,34 @@ function ModelView() {
     <div className="view-content">
       <div className="section-intro"><div><span className="section-kicker">RANDOM FOREST</span><h2>두 모델을 함께 비교합니다.</h2></div></div>
       <div className="model-grid">
-        <ModelCard title="전체 연령 모델" r2="0.846" mae="9.700" rmse="14.871" importance={analysisAllAges.importance} />
-        <ModelCard title="65세 이상 모델" r2="0.837" mae="3.209" rmse="4.917" importance={analysisElderly.importance} />
+        <ModelCard title="전체 연령 모델" r2="0.846" mae="9.700" rmse="14.871" r2Year="0.686" importance={analysisAllAges.importance} />
+        <ModelCard title="65세 이상 모델" r2="0.837" mae="3.209" rmse="4.917" r2Year="0.687" importance={analysisElderly.importance} />
       </div>
-      <div className="info-strip"><BarChart3 size={20} /><p>두 모델 모두 2022~2025년 여름철 536일, 기상 변수 8개를 사용했습니다. R²는 정확도 퍼센트가 아닙니다.</p></div>
-      <div className="model-note">
-        <h3>모델 설명</h3>
-        <p>두 모델 모두 scikit-learn <code>RandomForestRegressor</code>로 학습했습니다. 여러 개의 결정 트리가 각자 예측한 값을 평균 내어 최종 환자 수를 추정하며, 트리 하나에 의존하는 것보다 이상치에 덜 흔들립니다.</p>
-        <p>학습 데이터는 무작위로 80:20 분리해 428일로 학습하고 108일로 평가했습니다. 아래 변수 중요도는 각 모델이 예측에서 어떤 기상 변수에 더 의존하는지를 보여줍니다.</p>
+      <div className="info-strip"><BarChart3 size={20} /><p>테스트 결과는 데이터를 무작위로 80:20 분리한 평가입니다. 2025년 평가는 연도 분리 보조 실험이며 테스트 결과와 조건이 다릅니다. R²는 정확도 퍼센트가 아닙니다.</p></div>
+      <div className="section-intro" style={{ marginTop: 32 }}><div><h2>모델 입력 정보</h2></div></div>
+      <div className="insight-grid">
+        <article className="insight-card">
+          <h3>🌤️ 입력 기상 변수 8개</h3>
+          <ul>{analysisAllAges.weatherColumns.map((column) => <li key={column}>{column}</li>)}</ul>
+        </article>
+        <article className="insight-card">
+          <h3>📌 예측값의 의미</h3>
+          <p>전체 연령 모델: 전국 하루 전체 연령 예상 환자 수</p>
+          <p>65세 이상 모델: 전국 하루 65세 이상 예상 환자 수</p>
+          <p>두 모델은 서로 별도로 학습된 Random Forest 모델입니다.</p>
+        </article>
       </div>
+      <div className="notice-banner">모델 결과는 전국 하루 예상 신고 환자 수입니다. 특정 지역의 실제 환자 수나 개인의 발병 확률을 의미하지 않습니다.</div>
     </div>
   );
 }
 
-function ModelCard({ title, r2, mae, rmse, importance }: { title: string; r2: string; mae: string; rmse: string; importance: { feature: string; value: number }[] }) {
+function ModelCard({ title, r2, mae, rmse, r2Year, importance }: { title: string; r2: string; mae: string; rmse: string; r2Year: string; importance: { feature: string; value: number }[] }) {
   return (
     <article className="model-card">
       <div className="model-title"><span><Users size={19} /></span><h3>{title}</h3></div>
       <div className="model-score"><small>테스트 R²</small><strong>{r2}</strong></div>
-      <dl><div><dt>MAE</dt><dd>{mae}명</dd></div><div><dt>RMSE</dt><dd>{rmse}명</dd></div><div><dt>학습 / 테스트</dt><dd>428일 / 108일</dd></div></dl>
+      <dl><div><dt>MAE</dt><dd>{mae}명</dd></div><div><dt>RMSE</dt><dd>{rmse}명</dd></div><div><dt>학습 / 테스트</dt><dd>428일 / 108일</dd></div><div><dt>2025년 보조 평가 R²</dt><dd>{r2Year}</dd></div></dl>
       <div className="model-importance">
         <small>변수 중요도</small>
         <ResponsiveContainer width="100%" height={200}>
@@ -225,28 +236,52 @@ function AnalysisView({ target }: { target: string }) {
       {error && <div className="data-error">{error}</div>}
       {!analysis && !error && <div className="data-loading">학습 자료를 불러오는 중입니다.</div>}
       {analysis && <>
-        <div className="analysis-summary">
-          <div><span>학습 데이터</span><strong>{analysis.rowCount}일</strong></div>
-          <p>전국 단위 여름철 감시기간 자료이며, 환자 수가 0명인 날짜도 포함합니다.</p>
-        </div>
         <div className="chart-grid">
+          <ChartPanel title="기본 데이터">
+            <div className="data-table-wrap">
+              <table className="data-table">
+                <thead><tr>{analysis.preview.columns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
+                <tbody>{analysis.preview.rows.map((row, index) => (
+                  <tr key={index}>{analysis.preview.columns.map((column) => <td key={column}>{row[column]}</td>)}</tr>
+                ))}</tbody>
+              </table>
+            </div>
+            <p className="table-caption">전체 데이터 수: {analysis.rowCount}일 · 수집 연도: 2022~2025년</p>
+          </ChartPanel>
           <ChartPanel title="날짜별 환자 수">
             <ResponsiveContainer width="100%" height={270}>
               <LineChart data={analysis.timeSeries}><CartesianGrid stroke="#e8edf2" vertical={false} /><XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={42} /><YAxis tick={{ fontSize: 11 }} width={38} /><Tooltip /><Line type="monotone" dataKey="patients" name="환자 수" stroke="#1768ac" strokeWidth={2} dot={false} /></LineChart>
             </ResponsiveContainer>
           </ChartPanel>
+        </div>
+        <div className="chart-grid">
           <ChartPanel title="최고기온과 환자 수">
             <ResponsiveContainer width="100%" height={270}>
               <ScatterChart><CartesianGrid stroke="#e8edf2" /><XAxis type="number" dataKey="temperature" name="최고기온" unit="°C" tick={{ fontSize: 11 }} /><YAxis type="number" dataKey="patients" name="환자 수" tick={{ fontSize: 11 }} width={38} /><Tooltip cursor={{ strokeDasharray: "3 3" }} /><Scatter data={analysis.scatter} fill="#f06449" fillOpacity={0.58} /></ScatterChart>
             </ResponsiveContainer>
           </ChartPanel>
+          <ChartPanel title="기상 변수 중요도">
+            <ResponsiveContainer width="100%" height={270}>
+              <BarChart data={analysis.importance} margin={{ bottom: 42 }}><CartesianGrid stroke="#e8edf2" vertical={false} /><XAxis dataKey="feature" angle={-25} textAnchor="end" interval={0} tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} width={38} /><Tooltip /><Bar dataKey="value" name="중요도" fill="#0c2948" radius={[5, 5, 0, 0]} /></BarChart>
+            </ResponsiveContainer>
+          </ChartPanel>
         </div>
-        <ChartPanel title="기상 변수 중요도">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={analysis.importance} margin={{ bottom: 42 }}><CartesianGrid stroke="#e8edf2" vertical={false} /><XAxis dataKey="feature" angle={-25} textAnchor="end" interval={0} tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} width={38} /><Tooltip /><Bar dataKey="value" name="중요도" fill="#0c2948" radius={[5, 5, 0, 0]} /></BarChart>
-          </ResponsiveContainer>
-        </ChartPanel>
-        <section className="finding"><span>분석 메모</span><p>최고기온이 높은 구간에서 환자 수가 커지는 경향이 있지만, 비슷한 기온에서도 발생 규모에 차이가 있습니다. 모델은 기온·습도·풍속·강수·일조·일사 정보를 함께 사용합니다.</p></section>
+        <div className="section-intro" style={{ marginTop: 8 }}><div><h2>분석 결과 해석</h2></div></div>
+        <div className="insight-grid">
+          <article className="insight-card">
+            <h3>🌡️ 높은 기온에서 환자 수 증가</h3>
+            <p>전국 평균 최고기온이 높은 구간에서 환자가 많이 발생한 날들이 관찰됩니다.</p>
+            <p><strong>더운 날일수록 환자 발생 규모가 커지는 경향이 있습니다.</strong></p>
+          </article>
+          <article className="insight-card">
+            <h3>📊 같은 기온에서도 발생 규모 차이</h3>
+            <p>비슷한 최고기온에서도 날짜에 따라 환자 수가 크게 달라집니다.</p>
+            <p><strong>최고기온만으로 하루 환자 수를 설명하기는 어렵습니다.</strong></p>
+          </article>
+        </div>
+        <p className="table-caption">분석 범위: 전국 단위의 여름철 감시자료 · 특정 지역이나 개인의 위험을 직접 나타내지는 않습니다.</p>
+        <section className="finding"><span>분석 메모</span><p>이러한 특성을 반영하기 위해 기온·습도·풍속 등 8개 기상 변수를 함께 사용하는 Random Forest 모델을 적용했습니다. 변수 중요도는 이 모델이 어떤 기상 정보를 예측에 주로 활용했는지 해석하는 데 사용했습니다.</p></section>
+        <p className="table-caption">전국 평균을 이용한 분석이므로 특정 지역의 극단적인 더위나 개인의 온열질환 위험을 그대로 나타내지는 않습니다.</p>
       </>}
     </div>
   );
