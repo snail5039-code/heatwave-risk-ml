@@ -2,8 +2,8 @@
 
 import {
   Activity, AlertTriangle, BarChart3, CalendarDays, ChevronRight,
-  Clock3, CloudSun, Droplets, Gauge, MapPin, ShieldCheck, Sun,
-  ThermometerSun, Users, Wind,
+  Clock3, CloudSun, Droplets, Gauge, MapPin, Pin, ShieldCheck, Sun,
+  ThermometerSun, UserRound, Users, Wind,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -39,7 +39,6 @@ type AnalysisResponse = {
 
 export default function Dashboard() {
   const [view, setView] = useState<View>("forecast");
-  const [target, setTarget] = useState("전체 연령");
   const [city, setCity] = useState("대구");
   const [date, setDate] = useState(() => {
     const now = new Date();
@@ -48,7 +47,8 @@ export default function Dashboard() {
   });
   const [startHour, setStartHour] = useState(14);
   const [durationMinutes, setDurationMinutes] = useState(100);
-  const [result, setResult] = useState<PredictionResponse | null>(null);
+  const [resultAllAges, setResultAllAges] = useState<PredictionResponse | null>(null);
+  const [resultElderly, setResultElderly] = useState<PredictionResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -56,7 +56,7 @@ export default function Dashboard() {
     setLoading(true);
     setError("");
 
-    try {
+    async function fetchPrediction(target: string): Promise<PredictionResponse> {
       const response = await fetch("/api/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -64,7 +64,14 @@ export default function Dashboard() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message ?? "예측에 실패했습니다.");
-      setResult(data);
+      return data;
+    }
+
+    try {
+      // 고령자 위험도도 한 번에 바로 확인할 수 있도록 두 대상을 함께 조회한다.
+      const [allAges, elderly] = await Promise.all([fetchPrediction("전체 연령"), fetchPrediction("65세 이상")]);
+      setResultAllAges(allAges);
+      setResultElderly(elderly);
       setView("forecast");
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "예측에 실패했습니다.");
@@ -86,11 +93,10 @@ export default function Dashboard() {
           <button className={view === "analysis" ? "active" : ""} onClick={() => setView("analysis")}>데이터 분석</button>
       </nav>
       <section className="workspace">
-        <div className="page-heading"><p>온열질환 예측</p><h1>기상 조건별 온열질환자 수 예측</h1><span>전국 기상정보와 선택한 외출 시간대의 기상 조건을 비교해 예상 환자 수를 제공합니다.</span></div>
+        <div className="page-heading"><p>온열질환 예측</p><h1>기상 조건별 온열질환자 수 예측</h1><span>전국 기상정보와 선택한 외출 시간대의 기상 조건을 비교해 전체 연령과 65세 이상의 예상 환자 수를 함께 제공합니다.</span></div>
         <section className="search-panel">
           <div className="search-title"><strong>예측 조건 조회</strong><span>조회 조건을 선택한 후 예측 버튼을 눌러주세요.</span></div>
           <div className="search-fields">
-            <label className="field"><span><Users size={15} /> 예측 대상</span><select value={target} onChange={(event) => setTarget(event.target.value)}><option>전체 연령</option><option>65세 이상</option></select></label>
             <label className="field"><span><CalendarDays size={15} /> 예측 날짜</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
             <label className="field"><span><MapPin size={15} /> 외출 지역</span><select value={city} onChange={(event) => setCity(event.target.value)}>{cities.map((item) => <option key={item}>{item}</option>)}</select></label>
             <label className="field"><span><Clock3 size={15} /> 시작 시각</span><select value={startHour} onChange={(event) => setStartHour(Number(event.target.value))}>{Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{hour}시</option>)}</select></label>
@@ -99,26 +105,50 @@ export default function Dashboard() {
           </div>
           {error && <p className="form-error">{error}</p>}
         </section>
-        {view === "forecast" && <ForecastView city={city} target={target} date={date} startHour={startHour} durationMinutes={durationMinutes} result={result} loading={loading} />}
+        {view === "forecast" && <ForecastView city={city} date={date} startHour={startHour} durationMinutes={durationMinutes} resultAllAges={resultAllAges} resultElderly={resultElderly} loading={loading} />}
         {view === "model" && <ModelView />}
-        {view === "analysis" && <AnalysisView key={target} target={target} />}
+        {view === "analysis" && <AnalysisView />}
       </section>
     </main>
   );
 }
 
-function ForecastView({ city, target, date, startHour, durationMinutes, result, loading }: { city: string; target: string; date: string; startHour: number; durationMinutes: number; result: PredictionResponse | null; loading: boolean }) {
-  const national = result?.national;
-  const local = result?.cityResult;
-  const shownCity = result?.city ?? city;
-  const shownDate = result?.date ?? date;
-  const shownHour = result?.startHour ?? startHour;
-  const shownDuration = result?.durationMinutes ?? durationMinutes;
-  const weather = local?.weather;
+function ForecastView({ city, date, startHour, durationMinutes, resultAllAges, resultElderly, loading }: { city: string; date: string; startHour: number; durationMinutes: number; resultAllAges: PredictionResponse | null; resultElderly: PredictionResponse | null; loading: boolean }) {
+  const shownCity = resultAllAges?.city ?? city;
+  const shownDate = resultAllAges?.date ?? date;
+  const weather = resultAllAges?.cityResult.weather;
+  const anyResult = resultAllAges ?? resultElderly;
 
   return (
     <div className="view-content">
-      <div className="section-intro"><div><span className="section-kicker">{shownDate}</span><h2>{result?.target ?? target} 예측 결과</h2></div><span className="updated">{result ? "예보 조회 완료" : "조건을 선택해 주세요"}</span></div>
+      <div className="section-intro"><div><span className="section-kicker">{shownDate}</span><h2>전체 연령 · 65세 이상 예측 결과</h2></div><span className="updated">{anyResult ? "예보 조회 완료" : "조건을 선택해 주세요"}</span></div>
+      <AgeGroupResult label="전체 연령" icon={<Users size={17} />} city={city} startHour={startHour} durationMinutes={durationMinutes} result={resultAllAges} />
+      <AgeGroupResult label="65세 이상" icon={<UserRound size={17} />} city={city} startHour={startHour} durationMinutes={durationMinutes} result={resultElderly} />
+      <section className="weather-panel">
+        <div className="panel-title"><div><CloudSun size={20} /><strong>{shownCity} 외출 시간대 날씨</strong></div><WarningChip warning={anyResult?.warning} /></div>
+        <div className="weather-grid">
+          <WeatherItem icon={<ThermometerSun />} label="평균기온" value={weather ? `${weather["평균기온(°C)"].toFixed(1)}°C` : "—"} />
+          <WeatherItem icon={<Droplets />} label="평균습도" value={weather ? `${weather["평균 상대습도(%)"].toFixed(0)}%` : "—"} />
+          <WeatherItem icon={<Wind />} label="평균풍속" value={weather ? `${weather["평균 풍속(m/s)"].toFixed(1)} m/s` : "—"} />
+          <WeatherItem icon={<Gauge />} label="최고 / 최저" value={weather ? `${weather["최고기온(°C)"].toFixed(1)}° / ${weather["최저기온(°C)"].toFixed(1)}°` : "—"} />
+        </div>
+      </section>
+      <GuidancePanel label="전체 연령 외출 안내" result={resultAllAges} loading={loading} />
+      <GuidancePanel label="65세 이상 외출 안내" result={resultElderly} loading={loading} />
+    </div>
+  );
+}
+
+function AgeGroupResult({ label, icon, city, startHour, durationMinutes, result }: { label: string; icon: React.ReactNode; city: string; startHour: number; durationMinutes: number; result: PredictionResponse | null }) {
+  const national = result?.national;
+  const local = result?.cityResult;
+  const shownCity = result?.city ?? city;
+  const shownHour = result?.startHour ?? startHour;
+  const shownDuration = result?.durationMinutes ?? durationMinutes;
+
+  return (
+    <div className="age-group">
+      <h3 className="age-heading">{icon} {label}</h3>
       <div className="result-grid">
         <article className="result-card national">
           <div className="card-topline"><span>전국 하루 평균</span><RiskBadge level={national?.level} /></div>
@@ -130,20 +160,24 @@ function ForecastView({ city, target, date, startHour, durationMinutes, result, 
           <div className="card-topline"><span>{shownCity} · {shownHour}시부터 {shownDuration}분</span><RiskBadge level={local?.level} /></div>
           <div className="result-number">{local ? Math.round(local.prediction) : "—"}{local && <small>명</small>}</div>
           <p>선택한 외출 시간대의 기온·습도·풍속을 반영한 참고값입니다.</p>
-          <div className="temp-line"><ThermometerSun size={19} /> 시간대 평균기온 <strong>{weather ? `${weather["평균기온(°C)"].toFixed(1)}°C` : "대기 중"}</strong></div>
+          <div className="temp-line"><ThermometerSun size={19} /> 시간대 평균기온 <strong>{local ? `${local.weather["평균기온(°C)"].toFixed(1)}°C` : "대기 중"}</strong></div>
         </article>
       </div>
-      <section className="weather-panel">
-        <div className="panel-title"><div><CloudSun size={20} /><strong>{shownCity} 외출 시간대 날씨</strong></div><WarningChip warning={result?.warning} /></div>
-        <div className="weather-grid">
-          <WeatherItem icon={<ThermometerSun />} label="평균기온" value={weather ? `${weather["평균기온(°C)"].toFixed(1)}°C` : "—"} />
-          <WeatherItem icon={<Droplets />} label="평균습도" value={weather ? `${weather["평균 상대습도(%)"].toFixed(0)}%` : "—"} />
-          <WeatherItem icon={<Wind />} label="평균풍속" value={weather ? `${weather["평균 풍속(m/s)"].toFixed(1)} m/s` : "—"} />
-          <WeatherItem icon={<Gauge />} label="최고 / 최저" value={weather ? `${weather["최고기온(°C)"].toFixed(1)}° / ${weather["최저기온(°C)"].toFixed(1)}°` : "—"} />
-        </div>
-      </section>
-      <section className="guidance-panel"><div className="guidance-icon"><ShieldCheck size={24} /></div><div><span>외출 안내</span><h3>{loading ? "예보를 확인하고 있습니다." : local ? guidanceTitle(local.level) : "예측 결과 확인을 눌러주세요."}</h3><p>{result?.guidance.slice(1).join(" ") ?? "선택한 지역과 외출 시간에 맞춰 안내해 드립니다."}</p></div></section>
     </div>
+  );
+}
+
+function GuidancePanel({ label, result, loading }: { label: string; result: PredictionResponse | null; loading: boolean }) {
+  const level = result?.cityResult.level;
+  return (
+    <section className="guidance-panel">
+      <div className="guidance-icon"><ShieldCheck size={24} /></div>
+      <div>
+        <span>{label}</span>
+        <h3>{loading ? "예보를 확인하고 있습니다." : level ? guidanceTitle(level) : "예측 결과 확인을 눌러주세요."}</h3>
+        <p>{result?.guidance.slice(1).join(" ") ?? "선택한 지역과 외출 시간에 맞춰 안내해 드립니다."}</p>
+      </div>
+    </section>
   );
 }
 
@@ -181,11 +215,11 @@ function ModelView() {
       <div className="section-intro" style={{ marginTop: 32 }}><div><h2>모델 입력 정보</h2></div></div>
       <div className="insight-grid">
         <article className="insight-card">
-          <h3>🌤️ 입력 기상 변수 8개</h3>
+          <h3><CloudSun size={16} /> 입력 기상 변수 8개</h3>
           <ul>{analysisAllAges.weatherColumns.map((column) => <li key={column}>{column}</li>)}</ul>
         </article>
         <article className="insight-card">
-          <h3>📌 예측값의 의미</h3>
+          <h3><Pin size={16} /> 예측값의 의미</h3>
           <p>전체 연령 모델: 전국 하루 전체 연령 예상 환자 수</p>
           <p>65세 이상 모델: 전국 하루 65세 이상 예상 환자 수</p>
           <p>두 모델은 서로 별도로 학습된 Random Forest 모델입니다.</p>
@@ -212,12 +246,15 @@ function ModelCard({ title, r2, mae, rmse, r2Year, importance }: { title: string
   );
 }
 
-function AnalysisView({ target }: { target: string }) {
+function AnalysisView() {
+  const [target, setTarget] = useState("전체 연령");
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
+    setAnalysis(null);
+    setError("");
     fetch(`/api/analysis?target=${encodeURIComponent(target)}`)
       .then(async (response) => {
         const data = await response.json();
@@ -232,7 +269,13 @@ function AnalysisView({ target }: { target: string }) {
 
   return (
     <div className="view-content">
-      <div className="section-intro"><div><span className="section-kicker">2022—2025 · {target}</span><h2>기상과 환자 수의 관계를 확인합니다.</h2></div></div>
+      <div className="section-intro">
+        <div><span className="section-kicker">2022—2025 · {target}</span><h2>기상과 환자 수의 관계를 확인합니다.</h2></div>
+        <div className="target-toggle">
+          <button type="button" className={target === "전체 연령" ? "active" : ""} onClick={() => setTarget("전체 연령")}>전체 연령</button>
+          <button type="button" className={target === "65세 이상" ? "active" : ""} onClick={() => setTarget("65세 이상")}>65세 이상</button>
+        </div>
+      </div>
       {error && <div className="data-error">{error}</div>}
       {!analysis && !error && <div className="data-loading">학습 자료를 불러오는 중입니다.</div>}
       {analysis && <>
@@ -246,7 +289,7 @@ function AnalysisView({ target }: { target: string }) {
                 ))}</tbody>
               </table>
             </div>
-            <p className="table-caption">전체 데이터 수: {analysis.rowCount}일 · 수집 연도: 2022~2025년</p>
+            <p className="analysis-caption">전체 데이터 수: {analysis.rowCount}일 · 수집 연도: 2022~2025년</p>
           </ChartPanel>
           <ChartPanel title="날짜별 환자 수">
             <ResponsiveContainer width="100%" height={270}>
@@ -269,19 +312,19 @@ function AnalysisView({ target }: { target: string }) {
         <div className="section-intro" style={{ marginTop: 8 }}><div><h2>분석 결과 해석</h2></div></div>
         <div className="insight-grid">
           <article className="insight-card">
-            <h3>🌡️ 높은 기온에서 환자 수 증가</h3>
+            <h3><ThermometerSun size={16} /> 높은 기온에서 환자 수 증가</h3>
             <p>전국 평균 최고기온이 높은 구간에서 환자가 많이 발생한 날들이 관찰됩니다.</p>
             <p><strong>더운 날일수록 환자 발생 규모가 커지는 경향이 있습니다.</strong></p>
           </article>
           <article className="insight-card">
-            <h3>📊 같은 기온에서도 발생 규모 차이</h3>
+            <h3><BarChart3 size={16} /> 같은 기온에서도 발생 규모 차이</h3>
             <p>비슷한 최고기온에서도 날짜에 따라 환자 수가 크게 달라집니다.</p>
             <p><strong>최고기온만으로 하루 환자 수를 설명하기는 어렵습니다.</strong></p>
           </article>
         </div>
-        <p className="table-caption">분석 범위: 전국 단위의 여름철 감시자료 · 특정 지역이나 개인의 위험을 직접 나타내지는 않습니다.</p>
+        <p className="analysis-caption">분석 범위: 전국 단위의 여름철 감시자료 · 특정 지역이나 개인의 위험을 직접 나타내지는 않습니다.</p>
         <section className="finding"><span>분석 메모</span><p>이러한 특성을 반영하기 위해 기온·습도·풍속 등 8개 기상 변수를 함께 사용하는 Random Forest 모델을 적용했습니다. 변수 중요도는 이 모델이 어떤 기상 정보를 예측에 주로 활용했는지 해석하는 데 사용했습니다.</p></section>
-        <p className="table-caption">전국 평균을 이용한 분석이므로 특정 지역의 극단적인 더위나 개인의 온열질환 위험을 그대로 나타내지는 않습니다.</p>
+        <p className="analysis-caption">전국 평균을 이용한 분석이므로 특정 지역의 극단적인 더위나 개인의 온열질환 위험을 그대로 나타내지는 않습니다.</p>
       </>}
     </div>
   );
