@@ -34,7 +34,7 @@ Python만으로 실행하는 분석형 대시보드입니다. 사이드바에서
 
 ### 2. Next.js 웹사이트
 
-기존 Python 모델과 데이터, 기상 API 로직을 Next.js API Route에서 호출하는 별도 웹 대시보드입니다. 데스크톱과 모바일 화면에 대응하는 반응형 UI를 제공합니다.
+기존 Python 모델과 데이터, 기상 API 로직을 TypeScript로 이식한 별도 웹 대시보드입니다. 요청마다 Python을 실행하지 않아 Vercel 같은 서버리스 환경에도 배포할 수 있습니다. 데스크톱과 모바일 화면에 대응하는 반응형 UI를 제공합니다.
 
 #### 예측 결과
 
@@ -97,7 +97,7 @@ API 키가 없어도 앱과 분석 화면은 실행할 수 있지만 기상청 �
 
 ## Next.js 웹사이트 실행
 
-Python 가상환경을 준비한 뒤 `web` 폴더에서 실행합니다.
+`web` 폴더에서 실행합니다. Python 가상환경 없이도 동작합니다.
 
 ```powershell
 cd web
@@ -114,7 +114,11 @@ npm run build
 npm start
 ```
 
-Next.js API Route는 `web/scripts`의 Python 연결 스크립트를 실행하며, 프로젝트 루트의 `.venv`, 저장 모델, 학습 데이터와 `weather_api.py`를 함께 사용합니다.
+모델과 학습 데이터는 `web/src/data`에 정적 JSON으로 내보내 두었고, 기상 API 로직은 `web/src/lib`에 TypeScript로 이식했습니다. 모델이나 학습 데이터를 다시 만들었다면 아래 명령으로 JSON을 갱신해야 합니다 (프로젝트 루트 `.venv` 필요).
+
+```powershell
+.\.venv\Scripts\python.exe web\scripts\export_static_data.py
+```
 
 ## 프로젝트 구조
 

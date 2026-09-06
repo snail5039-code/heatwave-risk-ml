@@ -10,6 +10,8 @@ import {
   Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer,
   Scatter, ScatterChart, Tooltip, XAxis, YAxis,
 } from "recharts";
+import analysisAllAges from "@/data/analysis-all-ages.json";
+import analysisElderly from "@/data/analysis-elderly.json";
 
 const cities = ["서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종", "수원", "춘천", "청주", "전주", "목포", "안동", "창원", "제주"];
 type View = "forecast" | "model" | "analysis";
@@ -166,11 +168,37 @@ function WeatherItem({ icon, label, value }: { icon: React.ReactNode; label: str
 }
 
 function ModelView() {
-  return <div className="view-content"><div className="section-intro"><div><span className="section-kicker">RANDOM FOREST</span><h2>두 모델을 함께 비교합니다.</h2></div></div><div className="model-grid"><ModelCard title="전체 연령 모델" r2="0.846" mae="9.700" rmse="14.871" /><ModelCard title="65세 이상 모델" r2="0.837" mae="3.209" rmse="4.917" /></div><div className="info-strip"><BarChart3 size={20} /><p>두 모델 모두 2022~2025년 여름철 536일, 기상 변수 8개를 사용했습니다. R²는 정확도 퍼센트가 아닙니다.</p></div></div>;
+  return (
+    <div className="view-content">
+      <div className="section-intro"><div><span className="section-kicker">RANDOM FOREST</span><h2>두 모델을 함께 비교합니다.</h2></div></div>
+      <div className="model-grid">
+        <ModelCard title="전체 연령 모델" r2="0.846" mae="9.700" rmse="14.871" importance={analysisAllAges.importance} />
+        <ModelCard title="65세 이상 모델" r2="0.837" mae="3.209" rmse="4.917" importance={analysisElderly.importance} />
+      </div>
+      <div className="info-strip"><BarChart3 size={20} /><p>두 모델 모두 2022~2025년 여름철 536일, 기상 변수 8개를 사용했습니다. R²는 정확도 퍼센트가 아닙니다.</p></div>
+      <div className="model-note">
+        <h3>모델 설명</h3>
+        <p>두 모델 모두 scikit-learn <code>RandomForestRegressor</code>로 학습했습니다. 여러 개의 결정 트리가 각자 예측한 값을 평균 내어 최종 환자 수를 추정하며, 트리 하나에 의존하는 것보다 이상치에 덜 흔들립니다.</p>
+        <p>학습 데이터는 무작위로 80:20 분리해 428일로 학습하고 108일로 평가했습니다. 아래 변수 중요도는 각 모델이 예측에서 어떤 기상 변수에 더 의존하는지를 보여줍니다.</p>
+      </div>
+    </div>
+  );
 }
 
-function ModelCard({ title, r2, mae, rmse }: { title: string; r2: string; mae: string; rmse: string }) {
-  return <article className="model-card"><div className="model-title"><span><Users size={19} /></span><h3>{title}</h3></div><div className="model-score"><small>테스트 R²</small><strong>{r2}</strong></div><dl><div><dt>MAE</dt><dd>{mae}명</dd></div><div><dt>RMSE</dt><dd>{rmse}명</dd></div><div><dt>학습 / 테스트</dt><dd>428일 / 108일</dd></div></dl></article>;
+function ModelCard({ title, r2, mae, rmse, importance }: { title: string; r2: string; mae: string; rmse: string; importance: { feature: string; value: number }[] }) {
+  return (
+    <article className="model-card">
+      <div className="model-title"><span><Users size={19} /></span><h3>{title}</h3></div>
+      <div className="model-score"><small>테스트 R²</small><strong>{r2}</strong></div>
+      <dl><div><dt>MAE</dt><dd>{mae}명</dd></div><div><dt>RMSE</dt><dd>{rmse}명</dd></div><div><dt>학습 / 테스트</dt><dd>428일 / 108일</dd></div></dl>
+      <div className="model-importance">
+        <small>변수 중요도</small>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={importance} margin={{ bottom: 42 }}><CartesianGrid stroke="#e8edf2" vertical={false} /><XAxis dataKey="feature" angle={-25} textAnchor="end" interval={0} tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 10 }} width={34} /><Tooltip /><Bar dataKey="value" name="중요도" fill="#0c2948" radius={[4, 4, 0, 0]} /></BarChart>
+        </ResponsiveContainer>
+      </div>
+    </article>
+  );
 }
 
 function AnalysisView({ target }: { target: string }) {
